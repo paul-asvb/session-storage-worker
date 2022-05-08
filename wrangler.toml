@@ -1,0 +1,22 @@
+name = "webrtc-session"
+type = "javascript"
+workers_dev = true
+compatibility_date = "2022-05-08"
+kv_namespaces = [ 
+	 { binding = "webrtc_session", id = "11f3b074661b489bae1df638ff72d5d1" }
+]
+
+
+
+[build]
+command = "cargo install -q worker-build && worker-build --release" # required
+
+[build.upload]
+dir = "build/worker"
+format = "modules"
+main = "./shim.mjs"
+
+[[build.upload.rules]]
+globs = ["**/*.wasm"]
+type = "CompiledWasm"
+
