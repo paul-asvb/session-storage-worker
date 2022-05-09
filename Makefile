@@ -6,12 +6,17 @@ pub:
 	wrangler publish
 
 test-get:
-	curl https://cloudflare-rust-kv-example.paul-asvb.workers.dev/kv/mykey
+	curl https://webrtc-session.paul-asvb.workers.dev/
 
-test-post:
+test-reset:
+	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/ \
+   -H 'Content-Type: application/json' \
+   -d '{"sessions":[]}'
+
+test-create:
 	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/create \
    -H 'Content-Type: application/json' \
-   -d '{"data":[]}'
+   -d '{"id":"myid","session":"session_string"}'
 
 test: test-post test-get
 	echo "tested"
