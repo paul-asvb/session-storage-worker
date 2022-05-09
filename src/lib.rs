@@ -9,8 +9,8 @@ struct Session {
     session: String,
 }
 
-struct SessionStore{
-    session: Vec<Session>
+struct SessionStore {
+    session: Vec<Session>,
 }
 
 static STORE: &'static str = "webrtc_session";
@@ -52,15 +52,18 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
 async fn get_handler(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let store = match ctx.kv(STORE) {
         Ok(s) => s,
-        Err(err) => return Response::error(format!("{:?}", err), 204),
+        Err(_) => return Response::error("server error", 500),
     };
 
-    let mv: Vec<Session> = store.get(NAMESPACE);
+    let sessions = match store.get(NAMESPACE).json() {
+        Ok(s) => s,
+        Err(_) => return Response::error("server error", 500),
+    };
 
-    let content: Vec<Session> = match req.json().await {
-        _ => return Response::error("body parse error", 400),
+    match store.get(NAMESPACE).json::<Vec<Session>>().await {
+        Some(account) => Response::from_json(&account),
+        None => Response::error("Not found", 404),
     }
-
 }
 
 async fn post_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {

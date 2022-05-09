@@ -32,7 +32,7 @@ make pub
 
 ## Add kv store
 ```bash
- wrangler kv:namespace create "KV_FROM_RUST"
+ wrangler kv:namespace create "namespace_name"
  ```
  and copy request answer into wrangler.toml
 
