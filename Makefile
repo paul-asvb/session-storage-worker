@@ -11,7 +11,12 @@ test-get:
 test-reset:
 	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/ \
    -H 'Content-Type: application/json' \
-   -d '{"sessions":[]}'
+   -d '{"sessions":{}}'
+
+test-delete:
+	curl -X DELETE  https://webrtc-session.paul-asvb.workers.dev/delete \
+   -H 'Content-Type: application/json' \
+   -d 'myid'
 
 test-create:
 	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/create \
