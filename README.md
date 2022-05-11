@@ -1,6 +1,6 @@
 # Getting Started
 
-[DEMO](https://cloudflare-rust-kv-example.paul-asvb.workers.dev/kv)
+[DEMO](https://webrtc-session.paul-asvb.workers.dev)
 
 ## Prerequisities
 rust toolchain and: 
