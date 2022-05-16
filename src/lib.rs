@@ -47,29 +47,32 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     // functionality and a `RouteContext` which you can use to  and get route parameters and
     // Environment bindings like KV Stores, Durable Objects, Secrets, and Variables.
     router
-        .get_async("/", get_handler)
-        .post_async("/", post_handler)
-        .post_async("/create", create_handler)
-        .delete_async("/delete", delete_handler)
+        .get_async("/", get_sessions)
+        .post_async("/", set_sessions)
+        .post_async("/create", create_session)
+        .delete_async("/delete", delete_session)
         .get("/version", |_, _| Response::ok("version"))
         .run(req, env)
         .await
 }
 
-async fn get_handler(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+async fn get_sessions(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let store = match ctx.kv(STORE) {
         Ok(s) => s,
         Err(_) => return Response::error("server error: kv not found", 500),
     };
 
     match store.get(NAMESPACE).json::<SessionStore>().await {
-        Ok(Some(sessions)) => Response::from_json(&sessions.sessions),
+        Ok(Some(sessions)) => {
+            let res = Response::from_json(&sessions.sessions).unwrap();
+            Ok(with_cors(res))
+        }
         Ok(None) => Response::error("No sessions found", 404),
         Err(err) => Response::error(format!("server error: {:?}", err), 500),
     }
 }
 
-async fn post_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+async fn set_sessions(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let store = match ctx.kv(STORE) {
         Ok(s) => s,
         Err(err) => return Response::error(format!("{:?}", err), 204),
@@ -84,7 +87,8 @@ async fn post_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     if put.is_ok() {
         let exc = put.unwrap().execute().await;
         if exc.is_ok() {
-            return Response::ok("success");
+            let res = Response::ok("success").unwrap();
+            return Ok(with_cors(res));
         } else {
             return Response::error("storage error", 500);
         }
@@ -93,7 +97,7 @@ async fn post_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     }
 }
 
-async fn create_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let store = match ctx.kv(STORE) {
         Ok(s) => s,
         Err(err) => return Response::error(format!("{:?}", err), 204),
@@ -123,7 +127,8 @@ async fn create_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     if put.is_ok() {
         let exc = put.unwrap().execute().await;
         if exc.is_ok() {
-            return Response::ok("success");
+            let res = Response::ok("success").unwrap();
+            return Ok(with_cors(res));
         } else {
             return Response::error("storage error", 500);
         }
@@ -132,7 +137,7 @@ async fn create_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     }
 }
 
-async fn delete_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+async fn delete_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     let store = match ctx.kv(STORE) {
         Ok(s) => s,
         Err(err) => return Response::error(format!("{:?}", err), 204),
@@ -160,11 +165,26 @@ async fn delete_handler(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     if put.is_ok() {
         let exc = put.unwrap().execute().await;
         if exc.is_ok() {
-            return Response::ok("success");
+            let res = Response::ok("success").unwrap();
+            return Ok(with_cors(res));
         } else {
             return Response::error("storage error", 500);
         }
     } else {
         return Response::error("storage error", 500);
     }
+}
+
+fn with_cors(res: Response) -> Response {
+    let mut headers = Headers::default();
+    headers
+        .append(&"Access-Control-Allow-Origin".to_string(), &"*".to_string())
+        .unwrap();
+    headers
+        .append(&"Content-type".to_string(), &"application/json".to_string())
+        .unwrap();
+    headers
+        .append(&"Access-Control-Max-Age".to_string(), &"86400".to_string())
+        .unwrap();
+    res.with_headers(headers)
 }
