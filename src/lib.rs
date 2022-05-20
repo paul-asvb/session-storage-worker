@@ -49,6 +49,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     router
         .get_async("/", get_sessions)
         .post_async("/", set_sessions)
+        .options_async("/", options_handler)
         .post_async("/create", create_session)
         .delete_async("/delete", delete_session)
         .get("/version", |_, _| Response::ok("version"))
@@ -173,6 +174,10 @@ async fn delete_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     } else {
         return Response::error("storage error", 500);
     }
+}
+
+async fn options_handler(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    Ok(with_cors(Response::ok("success").unwrap()))
 }
 
 fn with_cors(res: Response) -> Response {
