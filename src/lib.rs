@@ -8,9 +8,14 @@ mod utils;
 
 type Sessions = HashMap<String, Session>;
 #[derive(Serialize, Deserialize)]
+struct Offer {
+    offer_type: String,
+    sdp: String,
+}
+#[derive(Serialize, Deserialize)]
 struct Session {
-    id: String,
-    session: String,
+    peer_id: String,
+    offer: Offer,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -147,7 +152,7 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
 
     session_store
         .sessions
-        .insert(new_session.id.clone(), new_session);
+        .insert(new_session.peer_id.clone(), new_session);
 
     let put = store.put(NAMESPACE, session_store);
     if put.is_ok() {
@@ -201,7 +206,7 @@ async fn delete_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
     }
 }
 
-async fn options_handler(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+async fn options_handler(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
     Ok(with_cors(Response::ok("success").unwrap()))
 }
 
