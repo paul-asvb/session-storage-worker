@@ -211,6 +211,12 @@ fn with_cors(res: Response) -> Response {
         .append(&"Access-Control-Allow-Origin".to_string(), &"*".to_string())
         .unwrap();
     headers
+        .append(
+            &"Access-Control-Allow-Methods".to_string(),
+            &"GET, POST, OPTIONS, PUT, DELETE".to_string(),
+        )
+        .unwrap();
+    headers
         .append(&"Content-type".to_string(), &"application/json".to_string())
         .unwrap();
     headers
