@@ -49,6 +49,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     router
         .get_async("/", get_sessions)
         .post_async("/", set_sessions)
+        .delete_async("/", clear_sessions)
         .options_async("/", options_handler)
         .post_async("/create", create_session)
         .delete_async("/delete", delete_session)
@@ -82,6 +83,30 @@ async fn set_sessions(mut req: Request, ctx: RouteContext<()>) -> Result<Respons
     let content: SessionStore = match req.json().await {
         Ok(b) => b,
         _ => return Response::error("body parse error", 400),
+    };
+
+    let put = store.put(NAMESPACE, content);
+    if put.is_ok() {
+        let exc = put.unwrap().execute().await;
+        if exc.is_ok() {
+            let res = Response::ok("success").unwrap();
+            return Ok(with_cors(res));
+        } else {
+            return Response::error("storage error", 500);
+        }
+    } else {
+        return Response::error("storage error", 500);
+    }
+}
+
+async fn clear_sessions(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let store = match ctx.kv(STORE) {
+        Ok(s) => s,
+        Err(err) => return Response::error(format!("{:?}", err), 204),
+    };
+
+    let content = SessionStore {
+        sessions: HashMap::new(),
     };
 
     let put = store.put(NAMESPACE, content);
