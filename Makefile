@@ -13,6 +13,10 @@ test-reset:
    -H 'Content-Type: application/json' \
    -d '{"sessions":{}}'
 
+test-clear:
+	curl -X DELETE  https://webrtc-session.paul-asvb.workers.dev \
+   -H 'Content-Type: application/json' -v
+
 test-delete:
 	curl -X DELETE  https://webrtc-session.paul-asvb.workers.dev/delete \
    -H 'Content-Type: application/json' \
