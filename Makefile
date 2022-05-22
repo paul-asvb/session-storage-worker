@@ -25,7 +25,7 @@ test-delete:
 test-create:
 	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/create \
    -H 'Content-Type: application/json' \
-   -d '{"id":"myid","session":"session_string"}'
+   -d '{"peer_id":"myid","offer":{"type":"type1","sdp":"sdp_example"}}'
 
 test: test-post test-get
 	echo "tested"

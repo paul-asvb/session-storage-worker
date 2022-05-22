@@ -9,6 +9,7 @@ mod utils;
 type Sessions = HashMap<String, Session>;
 #[derive(Serialize, Deserialize)]
 struct Offer {
+    #[serde(rename = "type")]
     offer_type: String,
     sdp: String,
 }
