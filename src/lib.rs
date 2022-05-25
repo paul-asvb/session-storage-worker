@@ -230,3 +230,14 @@ fn with_cors(res: Response) -> Response {
         .unwrap();
     res.with_headers(headers)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::Session;
+
+    #[test]
+    fn test_calc_patient_age() {
+        let data = r#"{"peer_id":"myid","offer":{"type":"type1","sdp":"sdp_example"}}"#;
+        let _v: Session = serde_json::from_str(data).unwrap();
+    }
+}
