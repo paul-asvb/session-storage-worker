@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use worker::*;
 
 mod utils;
+type Session = HashMap<String, Peer>;
 
 type Sessions = HashMap<String, Session>;
 #[derive(Serialize, Deserialize)]
@@ -14,7 +14,7 @@ struct Offer {
     sdp: String,
 }
 #[derive(Serialize, Deserialize)]
-struct Session {
+struct Peer {
     peer_id: String,
     offer: Offer,
 }
@@ -57,7 +57,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .post_async("/", set_sessions)
         .delete_async("/", clear_sessions)
         .options_async("/", options_handler)
-        .post_async("/create", create_session)
+        .post_async("/session", create_session)
+        .post_async("/session/:id", add_session)
         .delete_async("/delete", delete_session)
         .get("/version", |_, _| Response::ok("version"))
         .run(req, env)
@@ -135,8 +136,12 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         Err(err) => return Response::error(format!("{:?}", err), 204),
     };
 
-    let new_session: Session = match req.json().await {
-        Ok(s) => s,
+    let new_session: Session = match req.json::<Peer>().await {
+        Ok(peer) => {
+            let mut session = Session::new();
+            session.insert(peer.peer_id.clone(), peer);
+            session
+        }
         Err(err) => {
             return Response::error(
                 format!("body parse error: {:?} in {:?}", err, req.text().await),
@@ -153,7 +158,7 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
 
     session_store
         .sessions
-        .insert(new_session.peer_id.clone(), new_session);
+        .insert("random_id".to_string(), new_session);
 
     let put = store.put(NAMESPACE, session_store);
     if put.is_ok() {
@@ -166,6 +171,51 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         }
     } else {
         return Response::error("storage error", 500);
+    }
+}
+
+async fn add_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let store = match ctx.kv(STORE) {
+        Ok(s) => s,
+        Err(err) => return Response::error(format!("{:?}", err), 204),
+    };
+
+    if let Some(session_id) = ctx.param("id") {
+        let peer: Peer = match req.json().await {
+            Ok(s) => s,
+            Err(err) => {
+                return Response::error(
+                    format!("body parse error: {:?} in {:?}", err, req.text().await),
+                    400,
+                )
+            }
+        };
+
+        let mut session_store = match store.get(NAMESPACE).json::<SessionStore>().await {
+            Ok(Some(sessions)) => sessions,
+            Ok(None) => return Response::error("No sessions found", 404),
+            Err(err) => return Response::error(format!("server error: {:?}", err), 500),
+        };
+
+        if let Some(session) = session_store.sessions.get_mut(session_id) {
+            session.insert(peer.peer_id.clone(), peer);
+        } else {
+            return Response::error("No session found", 404);
+        };
+        let put = store.put(NAMESPACE, session_store);
+        if put.is_ok() {
+            let exc = put.unwrap().execute().await;
+            if exc.is_ok() {
+                let res = Response::ok("success").unwrap();
+                return Ok(with_cors(res));
+            } else {
+                return Response::error("storage error", 500);
+            }
+        } else {
+            return Response::error("storage error", 500);
+        }
+    } else {
+        return Response::error("could not parse param", 400);
     }
 }
 
