@@ -23,7 +23,7 @@ test-delete:
    -d 'myid'
 
 test-create:
-	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/create \
+	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/session \
    -H 'Content-Type: application/json' \
    -d '{"peer_id":"myid","offer":{"type":"type1","sdp":"sdp_example"}}'
 
