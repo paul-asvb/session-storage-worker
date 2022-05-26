@@ -11,6 +11,7 @@ cargo install wrangler
 ## dev
 
 ```bash
+cargo test
 wrangler dev
 ```
 
