@@ -136,12 +136,8 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         Err(err) => return Response::error(format!("{:?}", err), 204),
     };
 
-    let new_session: Session = match req.json::<Peer>().await {
-        Ok(peer) => {
-            let mut session = Session::new();
-            session.insert(peer.peer_id.clone(), peer);
-            session
-        }
+    let new_session: Session = match req.json::<Session>().await {
+        Ok(session) => session,
         Err(err) => {
             return Response::error(
                 format!("body parse error: {:?} in {:?}", err, req.text().await),
@@ -197,11 +193,12 @@ async fn add_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response
             Err(err) => return Response::error(format!("server error: {:?}", err), 500),
         };
 
-        if let Some(session) = session_store.sessions.get_mut(session_id) {
-            session.insert(peer.peer_id.clone(), peer);
-        } else {
-            return Response::error("No session found", 404);
-        };
+        let mut session: Session = HashMap::new();
+        if let Some(s) = session_store.sessions.get_mut(session_id) {
+            session = s
+        }
+        session.insert(peer.peer_id.clone(), peer);
+
         let put = store.put(NAMESPACE, session_store);
         if put.is_ok() {
             let exc = put.unwrap().execute().await;
