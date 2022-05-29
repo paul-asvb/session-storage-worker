@@ -42,7 +42,6 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .get_async("/", list_sessions)
         .post_async("/:id", create_session)
         .delete_async("/:id", delete_session)
-        .get("/version", |_, _| Response::ok("version"))
         .run(req, env)
         .await
         .map(|res| with_cors(res))
