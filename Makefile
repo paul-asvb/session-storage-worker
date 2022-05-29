@@ -8,22 +8,12 @@ pub:
 test-get:
 	curl https://webrtc-session.paul-asvb.workers.dev/
 
-test-reset:
-	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/ \
-   -H 'Content-Type: application/json' \
-   -d '{"sessions":{}}'
-
-test-clear:
-	curl -X DELETE  https://webrtc-session.paul-asvb.workers.dev \
-   -H 'Content-Type: application/json' -v
-
 test-delete:
-	curl -X DELETE  https://webrtc-session.paul-asvb.workers.dev/delete \
-   -H 'Content-Type: application/json' \
-   -d 'myid'
+	curl -X DELETE  https://webrtc-session.paul-asvb.workers.dev/test_session \
+   -H 'Content-Type: application/json'
 
 test-create:
-	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/session \
+	curl -X POST  https://webrtc-session.paul-asvb.workers.dev/test_session \
    -H 'Content-Type: application/json' \
    -d '{"peer_id":"myid","offer":{"type":"type1","sdp":"sdp_example"}}'
 

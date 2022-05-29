@@ -2,6 +2,7 @@
 
 [DEMO](https://webrtc-session.paul-asvb.workers.dev)
 
+[worker docs](https://docs.rs/worker/latest/worker/)
 ## Prerequisities
 rust toolchain and: 
 ```bash

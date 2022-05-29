@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use worker::*;
 
 mod utils;
-type Session = HashMap<String, Peer>;
 
-type Sessions = HashMap<String, Session>;
+use String as PeerId;
+type Session = HashMap<PeerId, Peer>;
+
 #[derive(Serialize, Deserialize)]
 struct Offer {
     #[serde(rename = "type")]
@@ -19,13 +20,7 @@ struct Peer {
     offer: Offer,
 }
 
-#[derive(Serialize, Deserialize)]
-struct SessionStore {
-    sessions: Sessions,
-}
-
-static STORE: &'static str = "webrtc_session";
-static NAMESPACE: &'static str = "sessions";
+static NAMESPACE: &'static str = "webrtc_session";
 
 fn log_request(req: &Request) {
     console_log!(
@@ -53,90 +48,42 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     // functionality and a `RouteContext` which you can use to  and get route parameters and
     // Environment bindings like KV Stores, Durable Objects, Secrets, and Variables.
     router
-        .get_async("/", get_sessions)
-        .post_async("/", set_sessions)
-        .delete_async("/", clear_sessions)
-        .options_async("/", options_handler)
-        .post_async("/session", create_session)
-        .post_async("/session/:id", add_session)
-        .delete_async("/delete", delete_session)
+        .get_async("/", list_sessions)
+        .post_async("/:id", create_session)
+        .delete_async("/:id", delete_session)
         .get("/version", |_, _| Response::ok("version"))
         .run(req, env)
         .await
+        .map(|res| with_cors(res))
 }
 
-async fn get_sessions(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let store = match ctx.kv(STORE) {
-        Ok(s) => s,
-        Err(_) => return Response::error("server error: kv not found", 500),
-    };
-
-    match store.get(NAMESPACE).json::<SessionStore>().await {
-        Ok(Some(sessions)) => {
-            let res = Response::from_json(&sessions.sessions).unwrap();
-            Ok(with_cors(res))
-        }
-        Ok(None) => Response::error("No sessions found", 404),
-        Err(err) => Response::error(format!("server error: {:?}", err), 500),
-    }
-}
-
-async fn set_sessions(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let store = match ctx.kv(STORE) {
+async fn list_sessions(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let store = match ctx.kv(NAMESPACE) {
         Ok(s) => s,
         Err(err) => return Response::error(format!("{:?}", err), 204),
     };
 
-    let content: SessionStore = match req.json().await {
-        Ok(b) => b,
-        _ => return Response::error("body parse error", 400),
+    let list = match store.list().execute().await {
+        Ok(l) => l.keys,
+        err => return Response::error(format!("server error: {:?}", err), 500),
     };
 
-    let put = store.put(NAMESPACE, content);
-    if put.is_ok() {
-        let exc = put.unwrap().execute().await;
-        if exc.is_ok() {
-            let res = Response::ok("success").unwrap();
-            return Ok(with_cors(res));
-        } else {
-            return Response::error("storage error", 500);
-        }
-    } else {
-        return Response::error("storage error", 500);
-    }
-}
-
-async fn clear_sessions(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let store = match ctx.kv(STORE) {
-        Ok(s) => s,
-        Err(err) => return Response::error(format!("{:?}", err), 204),
-    };
-
-    let content = SessionStore {
-        sessions: HashMap::new(),
-    };
-
-    let put = store.put(NAMESPACE, content);
-    if put.is_ok() {
-        let exc = put.unwrap().execute().await;
-        if exc.is_ok() {
-            let res = Response::ok("success").unwrap();
-            return Ok(with_cors(res));
-        } else {
-            return Response::error("storage error", 500);
-        }
-    } else {
-        return Response::error("storage error", 500);
-    }
+    let res = Response::from_json(&list).unwrap();
+    return Ok(res);
 }
 
 async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let store = match ctx.kv(STORE) {
+    let store = match ctx.kv(NAMESPACE) {
         Ok(s) => s,
         Err(err) => return Response::error(format!("{:?}", err), 204),
     };
 
-    let new_session: Session = match req.json::<Session>().await {
+    let session_id: &String = match ctx.param("id") {
+        Some(id) => id,
+        None => return Response::error(format!("session not found"), 404),
+    };
+
+    let peer: Peer = match req.json::<Peer>().await {
         Ok(session) => session,
         Err(err) => {
             return Response::error(
@@ -146,116 +93,60 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
         }
     };
 
-    let mut session_store = match store.get(NAMESPACE).json::<SessionStore>().await {
-        Ok(Some(sessions)) => sessions,
-        Ok(None) => return Response::error("No sessions found", 404),
-        Err(err) => return Response::error(format!("server error: {:?}", err), 500),
-    };
-
-    session_store
-        .sessions
-        .insert("random_id".to_string(), new_session);
-
-    let put = store.put(NAMESPACE, session_store);
-    if put.is_ok() {
-        let exc = put.unwrap().execute().await;
-        if exc.is_ok() {
-            let res = Response::ok("success").unwrap();
-            return Ok(with_cors(res));
-        } else {
-            return Response::error("storage error", 500);
-        }
-    } else {
-        return Response::error("storage error", 500);
-    }
-}
-
-async fn add_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let store = match ctx.kv(STORE) {
-        Ok(s) => s,
-        Err(err) => return Response::error(format!("{:?}", err), 204),
-    };
-
-    if let Some(session_id) = ctx.param("id") {
-        let peer: Peer = match req.json().await {
-            Ok(s) => s,
-            Err(err) => {
-                return Response::error(
-                    format!("body parse error: {:?} in {:?}", err, req.text().await),
-                    400,
-                )
-            }
-        };
-
-        let mut session_store = match store.get(NAMESPACE).json::<SessionStore>().await {
-            Ok(Some(sessions)) => sessions,
-            Ok(None) => return Response::error("No sessions found", 404),
-            Err(err) => return Response::error(format!("server error: {:?}", err), 500),
-        };
-
-        let mut session: Session = HashMap::new();
-        if let Some(s) = session_store.sessions.get_mut(session_id) {
-            session = s
-        }
-        session.insert(peer.peer_id.clone(), peer);
-
-        let put = store.put(NAMESPACE, session_store);
-        if put.is_ok() {
-            let exc = put.unwrap().execute().await;
-            if exc.is_ok() {
-                let res = Response::ok("success").unwrap();
-                return Ok(with_cors(res));
+    match store.get(session_id).json::<Session>().await {
+        Ok(Some(mut session)) => {
+            session.insert(peer.peer_id.clone(), peer);
+            let put = store.put(session_id, session);
+            if put.is_ok() {
+                let exc = put.unwrap().execute().await;
+                if exc.is_ok() {
+                    let res = Response::ok("success").unwrap();
+                    Ok(res)
+                } else {
+                    Response::error("storage error", 500)
+                }
             } else {
-                return Response::error("storage error", 500);
+                Response::error("storage error", 500)
             }
-        } else {
-            return Response::error("storage error", 500);
         }
-    } else {
-        return Response::error("could not parse param", 400);
+        Ok(None) => {
+            let mut session: Session = HashMap::new();
+            session.insert(peer.peer_id.clone(), peer);
+            let put = store.put(session_id, session);
+            if put.is_ok() {
+                let exc = put.unwrap().execute().await;
+                if exc.is_ok() {
+                    let res = Response::ok("success").unwrap();
+                    Ok(res)
+                } else {
+                    Response::error("storage error", 500)
+                }
+            } else {
+                Response::error("storage error", 500)
+            }
+        }
+        Err(err) => return Response::error(format!("server error: {:?}", err), 500),
     }
 }
 
-async fn delete_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let store = match ctx.kv(STORE) {
+async fn delete_session(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let store = match ctx.kv(NAMESPACE) {
         Ok(s) => s,
         Err(err) => return Response::error(format!("{:?}", err), 204),
     };
 
-    let key_to_delete: String = match req.text().await {
-        Ok(s) => s,
-        Err(err) => {
-            return Response::error(
-                format!("body parse error: {:?} in {:?}", err, req.text().await),
-                400,
-            )
-        }
+    let session_id: &String = match ctx.param("id") {
+        Some(id) => id,
+        None => return Response::error(format!("session not found"), 404),
     };
 
-    let mut session_store = match store.get(NAMESPACE).json::<SessionStore>().await {
-        Ok(Some(sessions)) => sessions,
-        Ok(None) => return Response::error("No sessions found", 404),
-        Err(err) => return Response::error(format!("server error: {:?}", err), 500),
-    };
-
-    session_store.sessions.remove(&key_to_delete);
-
-    let put = store.put(NAMESPACE, session_store);
+    let put = store.delete(session_id).await;
     if put.is_ok() {
-        let exc = put.unwrap().execute().await;
-        if exc.is_ok() {
-            let res = Response::ok("success").unwrap();
-            return Ok(with_cors(res));
-        } else {
-            return Response::error("storage error", 500);
-        }
+        let res = Response::ok("success").unwrap();
+        return Ok(res);
     } else {
         return Response::error("storage error", 500);
     }
-}
-
-async fn options_handler(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
-    Ok(with_cors(Response::ok("success").unwrap()))
 }
 
 fn with_cors(res: Response) -> Response {
@@ -280,11 +171,11 @@ fn with_cors(res: Response) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use crate::Session;
+    use crate::Peer;
 
     #[test]
     fn test_calc_patient_age() {
         let data = r#"{"peer_id":"myid","offer":{"type":"type1","sdp":"sdp_example"}}"#;
-        let _v: Session = serde_json::from_str(data).unwrap();
+        let _v: Peer = serde_json::from_str(data).unwrap();
     }
 }
