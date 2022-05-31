@@ -40,6 +40,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     let router = Router::new();
     router
         .get_async("/", list_sessions)
+        .get_async("/:id", get_session)
         .post_async("/:id", create_session)
         .delete_async("/:id", delete_session)
         .run(req, env)
@@ -60,6 +61,24 @@ async fn list_sessions(_req: Request, ctx: RouteContext<()>) -> Result<Response>
 
     let res = Response::from_json(&list).unwrap();
     return Ok(res);
+}
+
+async fn get_session(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    let store = match ctx.kv(NAMESPACE) {
+        Ok(s) => s,
+        Err(err) => return Response::error(format!("{:?}", err), 204),
+    };
+
+    let session_id: &String = match ctx.param("id") {
+        Some(id) => id,
+        None => return Response::error(format!("session not found"), 404),
+    };
+
+    match store.get(session_id).json::<Session>().await {
+        Ok(Some(session)) => Ok(Response::from_json(&session).unwrap()),
+        Ok(None) => Response::error(format!("session not found"), 404),
+        Err(err) => Response::error(format!("store get: {:?}", err), 500),
+    }
 }
 
 async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
