@@ -43,6 +43,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .get_async("/:id", get_session)
         .post_async("/:id", create_session)
         .delete_async("/:id", delete_session)
+        .options_async("/*", preflight)
         .run(req, env)
         .await
         .map(|res| with_cors(res))
@@ -156,6 +157,10 @@ async fn delete_session(_req: Request, ctx: RouteContext<()>) -> Result<Response
     } else {
         return Response::error("storage error", 500);
     }
+}
+
+async fn preflight(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
+    Ok(Response::ok("success").unwrap())
 }
 
 fn with_cors(res: Response) -> Response {
