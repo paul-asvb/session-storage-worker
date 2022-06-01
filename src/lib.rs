@@ -5,8 +5,7 @@ use worker::*;
 
 mod utils;
 
-use String as PeerId;
-type Session = HashMap<PeerId, Peer>;
+type Session = Vec<Peer>;
 
 #[derive(Serialize, Deserialize)]
 struct Offer {
@@ -105,7 +104,7 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
 
     match store.get(session_id).json::<Session>().await {
         Ok(Some(mut session)) => {
-            session.insert(peer.peer_id.clone(), peer);
+            session.push(peer);
             let put = store.put(session_id, session);
             if put.is_ok() {
                 let exc = put.unwrap().execute().await;
@@ -120,8 +119,7 @@ async fn create_session(mut req: Request, ctx: RouteContext<()>) -> Result<Respo
             }
         }
         Ok(None) => {
-            let mut session: Session = HashMap::new();
-            session.insert(peer.peer_id.clone(), peer);
+            let session: Session = vec![peer];
             let put = store.put(session_id, session);
             if put.is_ok() {
                 let exc = put.unwrap().execute().await;
