@@ -42,7 +42,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         .get_async("/:id", get_session)
         .post_async("/:id", create_session)
         .delete_async("/:id", delete_session)
-        .options_async("/*", preflight)
+        .options_async("/:id", preflight)
         .run(req, env)
         .await
         .map(|res| with_cors(res))
