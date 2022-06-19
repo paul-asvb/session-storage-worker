@@ -1,4 +1,6 @@
-# Getting Started
+# session storage
+
+session storage for webrtc sessions implemented on cloudflare worker with cloudflare KV-store
 
 [DEMO](https://webrtc-session.paul-asvb.workers.dev)
 
